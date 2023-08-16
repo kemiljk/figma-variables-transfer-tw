@@ -1,6 +1,6 @@
 # Figma Variables››Transporter
 
-> This is build off of a basic React/Tailwind template and uses PNPM to handle builds.
+This is built off of a basic React/Tailwind template and uses PNPM to handle builds. If you don't have PNPM installed globally, follow [these instructions](https://pnpm.io/installation).
 
 ### Pre-requisites
 
