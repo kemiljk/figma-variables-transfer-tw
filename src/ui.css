@@ -1,3 +1,32 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-figma: var(--figma-color-bg);
+    --bg-figma-secondary: var(--figma-color-bg-secondary);
+    --bg-figma-secondary-hover: var(--figma-color-bg-selected);
+    --bg-figma-tertiary: var(--figma-color-bg-tertiary);
+    --blue-figma: var(--figma-color-bg-brand);
+    --blue-figma-hover: var(--figma-color-bg-brand-hover);
+    --text-figma: var(--figma-color-text);
+    --text-figma-secondary: var(--figma-color-text-secondary);
+    --text-figma-hover: var(--figma-color-text-hover);
+    --text-figma-secondary-hover: var(--figma-color-text-secondary-hover);
+    --text-figma-onbrand: var(--figma-color-text-onbrand);
+    --text-figma-brand: var(--figma-color-text-brand);
+    --border-figma: var(--figma-color-border);
+    --icon-figma: var(--figma-color-icon);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  main {
+    height: 100%;
+  }
+}

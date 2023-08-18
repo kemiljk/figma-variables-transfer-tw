@@ -1,8 +1,12 @@
 {
-  "name": "Figma Plugin Tailwind Starter",
-  "id": "",
+  "name": "Variable››transporter",
+  "id": "1261261815164515762",
   "api": "1.0.0",
   "main": "dist/code.js",
   "ui": "dist/ui.html",
-  "editorType": ["figma", "figjam"]
+  "permissions": [],
+  "networkAccess": {
+    "allowedDomains": ["none"]
+  },
+  "editorType": ["figma"]
 }
