@@ -8,5 +8,13 @@
   "networkAccess": {
     "allowedDomains": ["none"]
   },
-  "editorType": ["figma"]
+  "editorType": ["figma", "dev"],
+  "capabilities": ["inspect"],
+  "relaunchButtons": [
+    {
+      "command": "relaunch",
+      "name": "Generate Variables",
+      "multipleSelection": false
+    }
+  ]
 }

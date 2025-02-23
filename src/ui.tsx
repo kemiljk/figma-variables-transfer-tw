@@ -1,21 +1,18 @@
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 import * as Tabs from "@radix-ui/react-tabs";
-import * as Label from "@radix-ui/react-label";
 import "./ui.css";
 
 function App() {
-  const [inputValue, setInputValue] = React.useState("");
   const [isDisabled, setIsDisabled] = React.useState(true);
 
   window.onmessage = ({ data: { pluginMessage } }) => {
     if (pluginMessage.type === "EXPORT_RESULT") {
-      document.querySelector("textarea").innerHTML = pluginMessage.files
-        .map(
-          ({ fileName, body }) =>
-            `/* ${fileName} */\n\n${JSON.stringify(body, null, 2)}`
-        )
-        .join("\n\n\n");
+      document.querySelector("textarea").innerHTML = JSON.stringify(
+        pluginMessage.files,
+        null,
+        2
+      );
     }
     setIsDisabled(false);
   };
@@ -34,21 +31,32 @@ function App() {
   };
 
   const handleImport = (e: React.FormEvent<HTMLFormElement>) => {
-    const fileName = document.querySelector("input").value.trim();
     const body = document.querySelector("textarea").value.trim();
     e.preventDefault();
-    if (isValidJSON(body) && fileName) {
-      parent.postMessage(
-        { pluginMessage: { fileName, body, type: "IMPORT" } },
-        "*"
-      );
+
+    // Split the body into separate JSON objects
+    const jsonObjects = body.split("},").map((json, index, array) => {
+      // Add the closing bracket back for all but the last JSON object
+      if (index < array.length - 1) {
+        json += "}";
+      }
+      return json;
+    });
+
+    // Check if each JSON object is valid and if a filename is provided
+    const allValid = jsonObjects.every(isValidJSON);
+
+    if (allValid) {
+      // Post each JSON object separately
+      jsonObjects.forEach((json) => {
+        parent.postMessage(
+          { pluginMessage: { body: json, type: "IMPORT" } },
+          "*"
+        );
+      });
     } else {
       alert("Invalid filename or JSON");
     }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
   };
 
   function isValidJSON(body: string) {
@@ -114,23 +122,6 @@ function App() {
               className="flex h-full w-full flex-col space-y-4"
               onSubmit={handleImport}
             >
-              <div className="relative flex flex-wrap items-center gap-2">
-                <Label.Root
-                  className="text-xs font-medium text-figma-primary"
-                  htmlFor="IMPORT_INPUT"
-                >
-                  Collection Name
-                </Label.Root>
-                <input
-                  id="IMPORT_INPUT"
-                  placeholder="Collection Name"
-                  required
-                  type="text"
-                  value={inputValue}
-                  onChange={handleInputChange}
-                  className="inline-flex h-8 w-full appearance-none items-center justify-center rounded-md bg-figma-secondaryBg px-3 text-xs leading-none text-figma-primary outline-none focus:outline-blue-700 disabled:cursor-not-allowed disabled:text-figma-secondary dark:focus:outline-figma-blue"
-                />
-              </div>
               <textarea
                 required
                 placeholder="Tokens JSON"

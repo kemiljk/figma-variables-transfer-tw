@@ -2,11 +2,17 @@ figma.showUI(__html__, { themeColors: true, height: 548 });
 
 console.clear();
 
-function createCollection(name) {
+function createCollection(name, modes) {
   // @ts-ignore
   const collection = figma.variables.createVariableCollection(name);
-  const modeId = collection.modes[0].modeId;
-  return { collection, modeId };
+  // Rename the default mode
+  collection.renameMode(collection.modes[0].modeId, modes[0]);
+  // Add additional modes
+  const modeIds = [collection.modes[0].modeId];
+  for (let i = 1; i < modes.length; i++) {
+    modeIds.push(collection.addMode(modes[i]));
+  }
+  return { collection, modeIds };
 }
 
 function createToken(collection, modeId, type, name, value) {
@@ -24,23 +30,225 @@ function createVariable(collection, modeId, key, valueKey, tokens) {
   });
 }
 
+function validateVariableType(type) {
+  const validTypes = ["COLOR", "FLOAT", "STRING", "BOOLEAN"];
+  if (!validTypes.includes(type)) {
+    throw new Error(
+      `Invalid variable type: ${type}. Must be one of: ${validTypes.join(", ")}`
+    );
+  }
+}
+
+function validateVariableScope(scope) {
+  const validScopes = [
+    "ALL_SCOPES",
+    "TEXT_CONTENT",
+    "CORNER_RADIUS",
+    "WIDTH_HEIGHT",
+    "GAP",
+    "ROTATION",
+    "OPACITY",
+    "LAYOUT_GRID",
+    "EFFECT",
+    "PAINT",
+  ];
+  if (!validScopes.includes(scope)) {
+    throw new Error(
+      `Invalid variable scope: ${scope}. Must be one of: ${validScopes.join(
+        ", "
+      )}`
+    );
+  }
+}
+
 function importJSONFile({ fileName, body }) {
-  const json = JSON.parse(body);
-  const { collection, modeId } = createCollection(fileName);
-  const aliases = {};
-  const tokens = {};
-  Object.entries(json).forEach(([key, object]) => {
-    traverseToken({
-      collection,
-      modeId,
-      type: json.$type,
-      key,
-      object,
-      tokens,
-      aliases,
-    });
+  console.log(`Importing file: ${fileName}`);
+  let data;
+  try {
+    data = JSON.parse(body);
+  } catch (error) {
+    figma.notify("Invalid JSON format", { error: true });
+    console.error("JSON parse error:", error);
+    return;
+  }
+
+  if (!data.collections || !Array.isArray(data.collections)) {
+    figma.notify("Invalid format: Missing collections array", { error: true });
+    console.error("Invalid import format: missing collections array");
+    return;
+  }
+
+  let successCount = 0;
+  let errorCount = 0;
+
+  data.collections.forEach((collectionData) => {
+    try {
+      if (!collectionData.name) {
+        throw new Error("Collection name is required");
+      }
+
+      // Create the collection
+      // @ts-ignore
+      const collection = figma.variables.createVariableCollection(
+        collectionData.name
+      );
+
+      // Validate modes
+      if (!Array.isArray(collectionData.modes)) {
+        throw new Error("Collection modes must be an array");
+      }
+
+      // Set up modes
+      if (collectionData.modes.length > 0) {
+        if (!collectionData.modes[0].name) {
+          throw new Error("Mode name is required");
+        }
+        collection.renameMode(
+          collection.modes[0].modeId,
+          collectionData.modes[0].name
+        );
+      }
+
+      for (let i = 1; i < collectionData.modes.length; i++) {
+        if (!collectionData.modes[i].name) {
+          throw new Error(`Invalid mode name at index ${i}`);
+        }
+        collection.addMode(collectionData.modes[i].name);
+      }
+
+      // Validate variables
+      if (!Array.isArray(collectionData.variables)) {
+        throw new Error("Collection variables must be an array");
+      }
+
+      // Create all variables first
+      const variableMap = new Map();
+      collectionData.variables.forEach((varData, index) => {
+        try {
+          if (!varData.name) {
+            throw new Error(`Variable name is required at index ${index}`);
+          }
+          if (!varData.resolvedType) {
+            throw new Error(`Variable type is required for ${varData.name}`);
+          }
+
+          validateVariableType(varData.resolvedType);
+
+          // @ts-ignore
+          const variable = figma.variables.createVariable(
+            varData.name,
+            collection.id,
+            varData.resolvedType
+          );
+
+          if (varData.description) {
+            variable.description = varData.description;
+          }
+
+          if (Array.isArray(varData.scopes)) {
+            varData.scopes.forEach((scope) => validateVariableScope(scope));
+            variable.scopes = varData.scopes;
+          }
+
+          variableMap.set(varData.id, variable);
+        } catch (varError) {
+          console.error(`Error creating variable ${varData.name}:`, varError);
+          errorCount++;
+          return;
+        }
+      });
+
+      // Set values after all variables are created to handle aliases
+      collectionData.variables.forEach((varData) => {
+        const variable = variableMap.get(varData.id);
+        if (!variable) return;
+
+        try {
+          Object.entries(varData.valuesByMode).forEach(([modeId, value]) => {
+            if (!collection.modes.find((mode) => mode.modeId === modeId)) {
+              throw new Error(`Invalid mode ID: ${modeId}`);
+            }
+
+            if (
+              value &&
+              typeof value === "object" &&
+              "type" in value &&
+              value.type === "VARIABLE_ALIAS" &&
+              "id" in value
+            ) {
+              const referencedVariable = variableMap.get(value.id);
+              if (!referencedVariable) {
+                throw new Error(`Referenced variable not found: ${value.id}`);
+              }
+              variable.setValueForMode(modeId, {
+                type: "VARIABLE_ALIAS",
+                id: referencedVariable.id,
+              });
+            } else {
+              // Type-specific validation
+              switch (variable.resolvedType) {
+                case "COLOR":
+                  if (
+                    !value ||
+                    typeof value !== "object" ||
+                    !("r" in value && "g" in value && "b" in value)
+                  ) {
+                    throw new Error(`Invalid color value for ${variable.name}`);
+                  }
+                  break;
+                case "FLOAT":
+                  if (typeof value !== "number" && typeof value !== "string") {
+                    throw new Error(
+                      `Invalid number value for ${variable.name}`
+                    );
+                  }
+                  break;
+                case "BOOLEAN":
+                  if (
+                    typeof value !== "boolean" &&
+                    value !== "true" &&
+                    value !== "false"
+                  ) {
+                    throw new Error(
+                      `Invalid boolean value for ${variable.name}`
+                    );
+                  }
+                  break;
+              }
+              variable.setValueForMode(modeId, value);
+            }
+          });
+          successCount++;
+        } catch (valueError) {
+          console.error(
+            `Error setting values for variable ${varData.name}:`,
+            valueError
+          );
+          errorCount++;
+        }
+      });
+    } catch (error) {
+      console.error(
+        `Error importing collection ${collectionData.name}:`,
+        error
+      );
+      figma.notify(
+        `Error in collection ${collectionData.name}: ${error.message}`,
+        { error: true }
+      );
+      errorCount++;
+    }
   });
-  processAliases({ collection, modeId, aliases, tokens });
+
+  // Final status notification
+  if (errorCount === 0) {
+    figma.notify(`Successfully imported ${successCount} variables`);
+  } else {
+    figma.notify(
+      `Imported ${successCount} variables with ${errorCount} errors`,
+      { error: true }
+    );
+  }
 }
 
 function processAliases({ collection, modeId, aliases, tokens }) {
@@ -48,7 +256,7 @@ function processAliases({ collection, modeId, aliases, tokens }) {
   let generations = aliases.length;
   while (aliases.length && generations > 0) {
     for (let i = 0; i < aliases.length; i++) {
-      const { key, type, valueKey } = aliases[i];
+      const { key, valueKey } = aliases[i];
       const token = tokens[valueKey];
       if (token) {
         aliases.splice(i, 1);
@@ -92,24 +300,33 @@ function traverseToken({
           valueKey,
         };
       }
-    } else if (type === "color") {
-      tokens[key] = createToken(
-        collection,
-        modeId,
-        "COLOR",
-        key,
-        parseColor(object.$value)
-      );
-    } else if (type === "number") {
-      tokens[key] = createToken(
-        collection,
-        modeId,
-        "FLOAT",
-        key,
-        object.$value
-      );
     } else {
-      console.log("unsupported type", type, object);
+      let resolvedType;
+      let value = object.$value;
+
+      switch (type) {
+        case "color":
+          resolvedType = "COLOR";
+          value = parseColor(value);
+          break;
+        case "number":
+          resolvedType = "FLOAT";
+          value = typeof value === "number" ? value : parseFloat(value);
+          break;
+        case "string":
+          resolvedType = "STRING";
+          value = typeof value === "string" ? value : String(value);
+          break;
+        case "boolean":
+          resolvedType = "BOOLEAN";
+          value = typeof value === "boolean" ? value : value === "true";
+          break;
+        default:
+          console.log("unsupported type", type, object);
+          return;
+      }
+
+      tokens[key] = createToken(collection, modeId, resolvedType, key, value);
     }
   } else {
     Object.entries(object).forEach(([key2, object2]) => {
@@ -131,54 +348,86 @@ function traverseToken({
 function exportToJSON() {
   // @ts-ignore
   const collections = figma.variables.getLocalVariableCollections();
-  const files = [];
-  collections.forEach((collection) =>
-    files.push(...processCollection(collection))
-  );
-  figma.ui.postMessage({ type: "EXPORT_RESULT", files });
+  const exportData = {
+    collections: collections.map((collection) => ({
+      name: collection.name,
+      modes: collection.modes.map((mode) => ({
+        name: mode.name,
+        modeId: mode.modeId,
+      })),
+      variables: processCollectionVariables(collection),
+    })),
+  };
+
+  figma.ui.postMessage({ type: "EXPORT_RESULT", files: exportData });
 }
 
-function processCollection({ name, modes, variableIds }) {
-  const files = [];
-  modes.forEach((mode) => {
-    const file = { fileName: `${name}.${mode.name}.tokens.json`, body: {} };
-    variableIds.forEach((variableId) => {
-      const { name, resolvedType, valuesByMode } =
-        // @ts-ignore
-        figma.variables.getVariableById(variableId);
-      const value = valuesByMode[mode.modeId];
-      if (value !== undefined && ["COLOR", "FLOAT"].includes(resolvedType)) {
-        let obj = file.body;
-        name.split("/").forEach((groupName) => {
-          obj[groupName] = obj[groupName] || {};
-          obj = obj[groupName];
-        });
-        // @ts-ignore
-        obj.$type = resolvedType === "COLOR" ? "color" : "number";
-        // @ts-ignore
-        if (value.type === "VARIABLE_ALIAS") {
-          // @ts-ignore
-          obj.$value = `{${figma.variables
-            // @ts-ignore
-            .getVariableById(value.id)
-            .name.replace(/\//g, ".")}}`;
-        } else {
-          // @ts-ignore
-          obj.$value = resolvedType === "COLOR" ? rgbToHex(value) : value;
+function processCollectionVariables(collection) {
+  const variables = [];
+
+  collection.variableIds.forEach((variableId) => {
+    // @ts-ignore
+    const variable = figma.variables.getVariableById(variableId);
+    if (!variable) return;
+
+    const variableData = {
+      id: variable.id,
+      name: variable.name,
+      resolvedType: variable.resolvedType,
+      description: variable.description,
+      scopes: variable.scopes,
+      valuesByMode: {},
+    };
+
+    // Process values for each mode
+    collection.modes.forEach((mode) => {
+      const value = variable.valuesByMode[mode.modeId];
+      if (value === undefined) return;
+
+      if (
+        value &&
+        typeof value === "object" &&
+        "type" in value &&
+        value.type === "VARIABLE_ALIAS" &&
+        "id" in value
+      ) {
+        variableData.valuesByMode[mode.modeId] = {
+          type: "VARIABLE_ALIAS",
+          id: value.id,
+        };
+      } else {
+        switch (variable.resolvedType) {
+          case "COLOR":
+            variableData.valuesByMode[mode.modeId] = value;
+            break;
+          case "FLOAT":
+            variableData.valuesByMode[mode.modeId] =
+              typeof value === "number" ? value : parseFloat(String(value));
+            break;
+          case "STRING":
+            variableData.valuesByMode[mode.modeId] =
+              typeof value === "string" ? value : String(value);
+            break;
+          case "BOOLEAN":
+            variableData.valuesByMode[mode.modeId] =
+              typeof value === "boolean" ? value : value === "true";
+            break;
         }
       }
     });
-    files.push(file);
+
+    variables.push(variableData);
   });
-  return files;
+
+  return variables;
 }
 
 figma.ui.onmessage = (e) => {
   console.log("code received message", e);
   if (e.type === "IMPORT") {
-    const { fileName, body } = e;
-    console.log("importing", fileName, body);
-    importJSONFile({ fileName, body });
+    const { body } = e;
+    console.log("importing", body);
+    importJSONFile({ fileName: "variables.tokens.json", body });
     figma.notify("Imported tokens");
   } else if (e.type === "EXPORT") {
     console.log("exporting");
