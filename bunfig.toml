@@ -1,0 +1,9 @@
+[build]
+entrypoints = ["./src/code.ts", "./src/ui.tsx"]
+outdir = "dist"
+minify = true
+sourcemap = "external"
+
+[dev]
+hot = true
+port = 3000 

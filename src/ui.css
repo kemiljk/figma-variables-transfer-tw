@@ -18,6 +18,27 @@
     --text-figma-brand: var(--figma-color-text-brand);
     --border-figma: var(--figma-color-border);
     --icon-figma: var(--figma-color-icon);
+
+    /* Syntax highlighting theme */
+    --syntax-comment: #6E7781;
+    --syntax-string: #0550AE;
+    --syntax-number: #0550AE;
+    --syntax-constant: #0550AE;
+    --syntax-boolean: #0550AE;
+    --syntax-property: #953800;
+    --syntax-punctuation: #24292F;
+    --syntax-operator: #24292F;
+  }
+
+  html[class~="figma-dark"] {
+    --syntax-comment: #8B949E;
+    --syntax-string: #79C0FF;
+    --syntax-number: #79C0FF;
+    --syntax-constant: #79C0FF;
+    --syntax-boolean: #79C0FF;
+    --syntax-property: #FFA657;
+    --syntax-punctuation: #C9D1D9;
+    --syntax-operator: #C9D1D9;
   }
 
   * {
