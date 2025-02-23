@@ -60,12 +60,6 @@ module.exports = (env, argv) => {
       clean: true,
     },
 
-    watchOptions: {
-      ignored: ["**/node_modules", "**/dist"],
-      aggregateTimeout: 100,
-      poll: isDevelopment ? 1000 : false,
-    },
-
     optimization: {
       minimize: !isDevelopment,
       minimizer: [
@@ -74,19 +68,12 @@ module.exports = (env, argv) => {
             compress: {
               drop_console: !isDevelopment,
               drop_debugger: !isDevelopment,
-              pure_funcs: !isDevelopment ? ['console.log', 'console.info', 'console.debug'] : [],
-            },
-            mangle: true,
-            format: {
-              comments: false,
             },
           },
-          extractComments: false,
         }),
       ],
-      moduleIds: "deterministic",
       splitChunks: {
-        chunks: 'all',
+        chunks: 'async',
         minSize: 20000,
         minRemainingSize: 0,
         minChunks: 1,
@@ -108,17 +95,24 @@ module.exports = (env, argv) => {
       },
     },
 
+    watchOptions: {
+      ignored: ["**/node_modules", "**/dist"],
+      aggregateTimeout: 100,
+      poll: isDevelopment ? 1000 : false,
+    },
+
     plugins: [
       new webpack.DefinePlugin({
-        "process.env.NODE_ENV": JSON.stringify(isDevelopment ? "development" : "production"),
+        global: {},
       }),
       new HtmlWebpackPlugin({
-        inject: "body",
         template: "./src/ui.html",
         filename: "ui.html",
-        chunks: ["ui", "vendors"],
+        chunks: ["ui"],
         cache: false,
-        minify: !isDevelopment ? {
+        inject: "body",
+        scriptLoading: "blocking",
+        minify: isDevelopment ? false : {
           removeComments: true,
           collapseWhitespace: true,
           removeRedundantAttributes: true,
@@ -129,11 +123,10 @@ module.exports = (env, argv) => {
           minifyJS: true,
           minifyCSS: true,
           minifyURLs: true,
-        } : false,
+        },
       }),
-      new InlineChunkHtmlPlugin(HtmlWebpackPlugin, [/ui/, /vendors/]),
-      new webpack.ids.DeterministicModuleIdsPlugin(),
-    ],
+      !isDevelopment && new InlineChunkHtmlPlugin(HtmlWebpackPlugin, [/ui/]),
+    ].filter(Boolean),
 
     stats: {
       colors: true,

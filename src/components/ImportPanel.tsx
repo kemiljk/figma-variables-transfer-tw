@@ -76,48 +76,9 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
     }
   }, []);
 
-  const handlePaste = React.useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    try {
-      const text = e.clipboardData.getData('text');
-      if (text) {
-        e.preventDefault();
-        processData(text);
-        if (textareaRef.current) {
-          textareaRef.current.value = '';
-        }
-        setShowPasteArea(false);
-      } else {
-        setError("No text found in clipboard");
-      }
-    } catch (error) {
-      console.error('Paste error:', error);
-      setError("Failed to paste data");
-    }
-  }, []);
-
-  const handleInput = React.useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    if (text.trim()) {
-      try {
-        JSON.parse(text); // Test if valid JSON
-        processData(text);
-        setShowPasteArea(false);
-      } catch (error) {
-        // Don't show error while typing, only when pasting
-      }
-    }
-  }, []);
-
   const handlePasteButtonClick = React.useCallback(() => {
-    console.log('Paste button clicked, current state:', showPasteArea);
     setShowPasteArea(prev => !prev);
-    console.log('State should now be:', !showPasteArea);
-  }, [showPasteArea]);
-
-  // Remove the click outside handler for now to simplify debugging
-  React.useEffect(() => {
-    console.log('showPasteArea changed to:', showPasteArea);
-  }, [showPasteArea]);
+  }, []);
 
   // Add global paste handler
   React.useEffect(() => {
@@ -129,6 +90,11 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
         if (text) {
           e.preventDefault();
           await processData(text);
+          // Clear the textarea for visual feedback
+          if (textareaRef.current) {
+            textareaRef.current.value = '';
+          }
+          setShowPasteArea(false);
         }
       } catch (error) {
         console.error('Global paste error:', error);
@@ -186,10 +152,9 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
             ref={textareaRef}
             className="absolute inset-0 h-full w-full resize-none rounded-lg bg-figma p-3 text-xs text-figma-primary placeholder:text-figma-secondary focus:outline-none focus:ring-2 focus:ring-figma-blue focus:ring-offset-0 dark:text-figma-primary dark:placeholder:text-figma-secondary/50"
             placeholder="Paste your variables JSON here"
-            onPaste={handlePaste}
-            onInput={handleInput}
             autoFocus
             spellCheck={false}
+            readOnly
           />
         ) : (
           <div 

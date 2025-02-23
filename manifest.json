@@ -8,7 +8,7 @@
   "networkAccess": {
     "allowedDomains": ["none"]
   },
-  "editorType": ["figma", "dev"],
+  "editorType": ["figma"],
   "capabilities": [],
   "relaunchButtons": [
     {
@@ -17,5 +17,5 @@
       "multipleSelection": false
     }
   ],
-  "documentAccess": "dynamic-page"
+  "documentAccess": "dynamic-variables"
 }

@@ -1,46 +1,104 @@
 import * as React from "react";
 import { CollectionExport } from "../code";
 import { Copy, Check, Download } from 'lucide-react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import type { SyntaxHighlighterProps } from 'react-syntax-highlighter';
 import { lazy } from 'react';
 
-// Lazy load the syntax highlighter
-const SyntaxHighlighterLazy = lazy(() => import('react-syntax-highlighter/dist/esm/prism-light'));
+// Lazy load the syntax highlighter and language
+const LazyHighlighter = React.lazy(() => import('react-syntax-highlighter/dist/esm/light'));
+const LazyJson = React.lazy(() => import('react-syntax-highlighter/dist/esm/languages/hljs/json'));
 
-// Custom theme with better light/dark mode contrast
+// Custom theme using our CSS variables
 const customTheme = {
-  'pre[class*="language-"]': {
-    background: 'transparent',
-    margin: 0,
-    padding: 0,
-  },
-  'code[class*="language-"]': {
+  hljs: {
+    color: 'var(--syntax-punctuation)',
     background: 'transparent',
   },
-  'comment': {
-    color: 'var(--syntax-comment)'
+  'hljs-comment': {
+    color: 'var(--syntax-comment)',
   },
-  'string': {
-    color: 'var(--syntax-string)'
+  'hljs-string': {
+    color: 'var(--syntax-string)',
   },
-  'number': {
-    color: 'var(--syntax-number)'
+  'hljs-number': {
+    color: 'var(--syntax-number)',
   },
-  'constant': {
-    color: 'var(--syntax-constant)'
+  'hljs-literal': {
+    color: 'var(--syntax-boolean)',
   },
-  'boolean': {
-    color: 'var(--syntax-boolean)'
+  'hljs-attr': {
+    color: 'var(--syntax-property)',
   },
-  'property': {
-    color: 'var(--syntax-property)'
+  'hljs-property': {
+    color: 'var(--syntax-property)',
   },
-  'punctuation': {
-    color: 'var(--syntax-punctuation)'
+  'hljs-punctuation': {
+    color: 'var(--syntax-punctuation)',
   },
-  'operator': {
-    color: 'var(--syntax-operator)'
+  'hljs-operator': {
+    color: 'var(--syntax-operator)',
+  },
+  // Add specific JSON key handling
+  'hljs-keyword': {
+    color: 'var(--syntax-property)',
+  },
+  // Make sure strings in JSON are properly colored
+  '.hljs-string': {
+    color: 'var(--syntax-string)',
+  },
+};
+
+// Create a wrapper component for the syntax highlighter
+const JsonHighlighter: React.FC<{ code: string }> = ({ code }) => {
+  const [isReady, setIsReady] = React.useState(false);
+
+  React.useEffect(() => {
+    Promise.all([
+      import('react-syntax-highlighter/dist/esm/light'),
+      import('react-syntax-highlighter/dist/esm/languages/hljs/json')
+    ]).then(([highlighter, jsonLang]) => {
+      highlighter.default.registerLanguage('json', jsonLang.default);
+      setIsReady(true);
+    });
+  }, []);
+
+  if (!isReady) {
+    return (
+      <pre style={{ 
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        fontSize: '12px',
+        lineHeight: '16px'
+      }}>
+        {code}
+      </pre>
+    );
   }
+
+  return (
+    <React.Suspense fallback={
+      <pre style={{ 
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        fontSize: '12px',
+        lineHeight: '16px'
+      }}>
+        {code}
+      </pre>
+    }>
+      <LazyHighlighter
+        language="json"
+        style={customTheme}
+        customStyle={{
+          fontSize: '12px',
+          lineHeight: '16px',
+          background: 'transparent',
+        }}
+      >
+        {code}
+      </LazyHighlighter>
+    </React.Suspense>
+  );
 };
 
 interface ExportPanelProps {
@@ -134,23 +192,7 @@ export function ExportPanel({
 
           <div className="relative flex flex-1 flex-col rounded-lg border border-figma-border bg-black/5 p-2 dark:bg-white/5">
             <div className="h-[236px] overflow-auto rounded bg-white p-2 text-xs dark:bg-[#2c2c2c]">
-              <React.Suspense fallback={
-                <pre className="whitespace-pre-wrap font-mono">
-                  {JSON.stringify(exportedData, null, 2)}
-                </pre>
-              }>
-                <SyntaxHighlighterLazy
-                  language="json"
-                  style={customTheme}
-                  customStyle={{
-                    fontSize: '12px',
-                    lineHeight: '16px',
-                    background: 'transparent',
-                  }}
-                >
-                  {JSON.stringify(exportedData, null, 2)}
-                </SyntaxHighlighterLazy>
-              </React.Suspense>
+              <JsonHighlighter code={JSON.stringify(exportedData, null, 2)} />
             </div>
           </div>
         </>

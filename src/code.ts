@@ -21,11 +21,6 @@ figma.showUI(__html__, {
 
 console.clear();
 
-function validateVariableType(type: string): type is VariableResolvedDataType {
-  const validTypes = ["COLOR", "FLOAT", "STRING", "BOOLEAN"];
-  return validTypes.includes(type);
-}
-
 function validateVariableScope(scope: string): scope is VariableScope {
   const validScopes = [
     "ALL_SCOPES",
@@ -218,17 +213,12 @@ async function importJSONFile(data: string): Promise<void> {
   }
 }
 
-function exportToJSON(): void {
+async function exportToJSON(): Promise<void> {
   try {
-    const collections = figma.variables.getLocalVariableCollections();
-    const exportData: CollectionExport[] = collections.map(collection => ({
-      name: collection.name,
-      modes: collection.modes.map(mode => ({
-        name: mode.name,
-        modeId: mode.modeId
-      })),
-      variables: collection.variableIds
-        .map(id => {
+    const collections = await figma.variables.getLocalVariableCollectionsAsync();
+    const exportData: CollectionExport[] = collections.map((collection: VariableCollection) => {
+      const variables = collection.variableIds
+        .map((id: string) => {
           const variable = figma.variables.getVariableById(id);
           if (!variable) return null;
 
@@ -238,7 +228,7 @@ function exportToJSON(): void {
             resolvedType: variable.resolvedType,
             description: variable.description || undefined,
             scopes: variable.scopes,
-            valuesByMode: collection.modes.reduce((acc, mode) => {
+            valuesByMode: collection.modes.reduce((acc: Record<string, VariableValue>, mode: { name: string; modeId: string; }) => {
               const value = variable.valuesByMode[mode.modeId];
               if (value !== undefined) {
                 acc[mode.modeId] = value;
@@ -247,8 +237,17 @@ function exportToJSON(): void {
             }, {} as Record<string, VariableValue>)
           };
         })
-        .filter((v): v is NonNullable<typeof v> => v !== null)
-    }));
+        .filter((v): v is NonNullable<typeof v> => v !== null);
+
+      return {
+        name: collection.name,
+        modes: collection.modes.map((mode: { name: string; modeId: string; }) => ({
+          name: mode.name,
+          modeId: mode.modeId
+        })),
+        variables
+      };
+    });
 
     figma.ui.postMessage({ type: "EXPORT_RESULT", data: exportData });
   } catch (error) {
@@ -266,7 +265,7 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type === 'IMPORT') {
     await importJSONFile(msg.data);
   } else if (msg.type === 'EXPORT') {
-    exportToJSON();
+    await exportToJSON();
   }
 };
 
