@@ -9,12 +9,13 @@
     "allowedDomains": ["none"]
   },
   "editorType": ["figma", "dev"],
-  "capabilities": ["inspect"],
+  "capabilities": [],
   "relaunchButtons": [
     {
       "command": "relaunch",
-      "name": "Generate Variables",
+      "name": "Transport Variables",
       "multipleSelection": false
     }
-  ]
+  ],
+  "documentAccess": "dynamic-page"
 }
