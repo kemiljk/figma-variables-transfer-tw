@@ -2,6 +2,10 @@ import * as React from "react";
 import { CollectionExport } from "../code";
 import { Copy, Check, Download } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { lazy } from 'react';
+
+// Lazy load the syntax highlighter
+const SyntaxHighlighterLazy = lazy(() => import('react-syntax-highlighter/dist/esm/prism-light'));
 
 // Custom theme with better light/dark mode contrast
 const customTheme = {
@@ -129,18 +133,24 @@ export function ExportPanel({
           </div>
 
           <div className="relative flex flex-1 flex-col rounded-lg border border-figma-border bg-black/5 p-2 dark:bg-white/5">
-            <div className="h-[236px] overflow-auto rounded bg-figma p-2 text-xs">
-              <SyntaxHighlighter
-                language="json"
-                style={customTheme}
-                customStyle={{
-                  fontSize: '12px',
-                  lineHeight: '16px',
-                  background: 'transparent',
-                }}
-              >
-                {JSON.stringify(exportedData, null, 2)}
-              </SyntaxHighlighter>
+            <div className="h-[236px] overflow-auto rounded bg-white p-2 text-xs dark:bg-[#2c2c2c]">
+              <React.Suspense fallback={
+                <pre className="whitespace-pre-wrap font-mono">
+                  {JSON.stringify(exportedData, null, 2)}
+                </pre>
+              }>
+                <SyntaxHighlighterLazy
+                  language="json"
+                  style={customTheme}
+                  customStyle={{
+                    fontSize: '12px',
+                    lineHeight: '16px',
+                    background: 'transparent',
+                  }}
+                >
+                  {JSON.stringify(exportedData, null, 2)}
+                </SyntaxHighlighterLazy>
+              </React.Suspense>
             </div>
           </div>
         </>
